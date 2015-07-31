@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<Devices>
+	<Device type="sprinkler" id="opensprinkler">
+		<Name>OpenSprinkler Module</Name>
+		<ConfigUI>
+			<Field type="textfield" id="address" >
+				<Label>Network (IP) Address:</Label>
+			</Field>
+
+			<Field type="textfield" id="password" secure="true" defaultValue="opendoor">
+				<Label>Device password:</Label>
+			</Field>
+
+			<Field type="textfield" id="maxtime" defaultValue="3600">
+				<Label>Maximum time per zone, in seconds:</Label>
+			</Field>
+
+			<Field type="checkbox" id="ignorerain" defaultValue="false">
+				<Label>Ignore rain sensor:</Label>
+			</Field>
+
+		</ConfigUI>
+	</Device>
+</Devices>
