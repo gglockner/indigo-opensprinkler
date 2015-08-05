@@ -4,8 +4,8 @@ OpenSprinkler plugin for Indigo
 Written by Greg Glockner
 
 ## Description
-With this plugin, you can control or schedule OpenSprinkler via an
-Indigo server. Using weather data in Indigo, you can use weather
+With this plugin, you can control or schedule [OpenSprinkler](https://opensprinkler.com) via an
+[Indigo](http://www.indigodomo.com) server. Using weather data in Indigo, you can use weather
 conditions to determine how much to water your lawn.
 
 ## Installation
