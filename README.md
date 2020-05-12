@@ -29,3 +29,4 @@ schedules in OpenSprinkler.
 - The OpenSprinkler device must have a password set
 - You must have some way to identify the OpenSprinkler device on your local network, either via a fixed IP address or a hostname
 - If you have multiple sprinkler stations, they must be contiguous; the plugin will not recognize gaps in the list of stations
+- indigo-opensprinkler has been tested with the standard OpenSprinkler hardware, but not with Pi or Beagle versions

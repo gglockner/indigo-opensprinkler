@@ -143,7 +143,7 @@ class Plugin(indigo.PluginBase):
 				indigo.server.log(u"sent \"%s - %s\" on" % (dev.name, zoneName))
 				dev.updateStateOnServer("activeZone", action.zoneIndex)
 			except Exception as e:
-				indigo.server.log(u"send \"%s - %s\" on failed" % (dev.name, zoneName, unicode(e)), isError=True)
+				indigo.server.log(u"send \"%s\" zone \"%s\" on failed: %s" % (dev.name, zoneName, unicode(e)), isError=True)
 
 		###### ALL ZONES OFF ######
 		elif action.sprinklerAction == indigo.kSprinklerAction.AllZonesOff:
