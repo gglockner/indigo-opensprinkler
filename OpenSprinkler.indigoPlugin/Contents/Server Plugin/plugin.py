@@ -104,7 +104,11 @@ class Plugin(indigo.PluginBase):
 			raise ValueError(u'Cannot parse output for "%s", error: %s' % (dev.name, e.msg))
 	
 	def hasRain(self, dev):
-		return self.querySprinkler(dev, 'jc')['rs'] == 1
+		data = self.querySprinkler(dev, 'jc')
+		try:
+			return data['rs'] == 1
+		except IndexError:
+			return False
 	
 	def allZonesOff(self, dev, skip=-1):
 		try:
@@ -133,7 +137,7 @@ class Plugin(indigo.PluginBase):
 				sid = action.zoneIndex - 1
 				zoneName = dev.zoneNames[sid].replace(commaSep,",")
 				props = dev.pluginProps
-				if self.hasRain(dev) and not props['ignorerain']:
+				if not props['ignorerain'] and self.hasRain(dev):
 					indigo.server.log(u"Rain detected - cannot water \"%s - %s\"" % (dev.name, zoneName))
 					return
 				# Disable any current program
