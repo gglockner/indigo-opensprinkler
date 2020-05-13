@@ -107,7 +107,7 @@ class Plugin(indigo.PluginBase):
 		data = self.querySprinkler(dev, 'jc')
 		try:
 			return data['rs'] == 1
-		except IndexError:
+		except KeyError:
 			return False
 	
 	def allZonesOff(self, dev, skip=-1):
