@@ -8,33 +8,18 @@
 
 import indigo
 
-import urllib
-import json
+import requests
 import hashlib
 
 zoneSep = ","
 commaSep = "|"
 
-## Utility functions
-
-# Determine if bitfield k is set in number n
-def isset8(n, k):
-	return bool(n & 1 << k)
-
-# Determine if bitfield is set in masop
-def isset(masop, k):
-	return isset8(masop[k/8], k%8)
-
-
 ################################################################################
 class Plugin(indigo.PluginBase):
 	########################################
 	def __init__(self, pluginId, pluginDisplayName, pluginVersion, pluginPrefs):
-		indigo.PluginBase.__init__(self, pluginId, pluginDisplayName, pluginVersion, pluginPrefs)
+		super().__init__(pluginId, pluginDisplayName, pluginVersion, pluginPrefs)
 		self.debug = True
-
-	def __del__(self):
-		indigo.PluginBase.__del__(self)
 
 	########################################
 	def startup(self):
@@ -60,17 +45,17 @@ class Plugin(indigo.PluginBase):
 			status = self.querySprinkler(dev, "jn")
 			nStations = len(status['snames'])
 			stn_dis = status['stn_dis']
-			activeStations = [i for i in range(nStations) if not isset(stn_dis, i)]
+			activeStations = [idx for idx in range(nStations) if (stn_dis >> idx) & 1 == 0]
 			stationNames = [status['snames'][i].replace(",",commaSep) for i in activeStations]
-			indigo.server.log(u'Station names: %s' % (','.join(stationNames)))
-			indigo.server.log(u'%i stations are active' % len(activeStations))
+			self.logger.info(u'Station names: %s' % (','.join(stationNames)))
+			self.logger.info(u'%i stations are active' % len(activeStations))
 			newProps = dev.pluginProps
 			newProps['ZoneNames'] = zoneSep.join(stationNames)
 			# TODO: Implement if activeStations is not contiguous
 			newProps['NumZones'] = len(activeStations)
 			dev.replacePluginPropsOnServer(newProps)
 		except Exception as e:
-			indigo.server.log(u'Unable to start communication: %s' % unicode(e))
+			self.logger.info(u'Unable to start communication: %s' % str(e))
 
 	########################################
 	# Query OpenSprinkler device
@@ -79,17 +64,17 @@ class Plugin(indigo.PluginBase):
 		props = dev.pluginProps
 		url, pw = props['address'], props['password']
 		if not url.startswith("http"):
-			url = u"http://%s" % url
-		data['pw'] = hashlib.md5(pw).hexdigest()
+			url = f"http://{url}"
+		data['pw'] = hashlib.md5(pw.encode()).hexdigest()
 		try:
-			fp = urllib.urlopen("%s/%s?%s" % (url, keyword, urllib.urlencode(data)))
-			raw = fp.read()
-			output = json.loads(raw)
+			r = requests.get(f"{url}/{keyword}", data)
+			r.raise_for_status()
+			output = r.json()
 			errno = output.get('result',1)
 			strerror = {
-				1:  u'Success',
-				2:  u'Unauthorized',
-				3:  u'Mismatch',
+				1:	u'Success',
+				2:	u'Unauthorized',
+				3:	u'Mismatch',
 				16: u'Data Missing',
 				17: u'Out of Range',
 				18: u'Data Format Error',
@@ -97,9 +82,10 @@ class Plugin(indigo.PluginBase):
 				48: u'Not Permitted'}.get(errno, u'Unknown')
 			if errno != 1:
 				raise EnvironmentError(errno, u'%s - %s' % (dev.name, strerror))
+			for k,v in output.items():
+				if type(v)==list and len(v)==1:
+					output[k] = v[0]
 			return output
-		except IOError as e:
-			raise IOError(e.errno, 'Cannot connect to %s' % url)
 		except ValueError as e:
 			raise ValueError(u'Cannot parse output for "%s", error: %s' % (dev.name, e.msg))
 	
@@ -117,10 +103,10 @@ class Plugin(indigo.PluginBase):
 				if i != skip:
 					self.querySprinkler(dev, "cm", {'sid': i, 'en': 0})
 			if skip < 0:
-				indigo.server.log(u"sent \"%s\" %s" % (dev.name, "all zones off"))
+				self.logger.info(u"sent \"%s\" %s" % (dev.name, "all zones off"))
 				dev.updateStateOnServer("activeZone", 0)
 		except Exception as e:
-			indigo.server.log(u"send \"%s\" %s failed: %s" % (dev.name, "all zones off", unicode(e)), isError=True)
+			self.logger.info(u"send \"%s\" %s failed: %s" % (dev.name, "all zones off", str(e)), isError=True)
 	
 	########################################
 	# Sprinkler Control Action callback
@@ -138,16 +124,16 @@ class Plugin(indigo.PluginBase):
 				zoneName = dev.zoneNames[sid].replace(commaSep,",")
 				props = dev.pluginProps
 				if not props['ignorerain'] and self.hasRain(dev):
-					indigo.server.log(u"Rain detected - cannot water \"%s - %s\"" % (dev.name, zoneName))
+					self.logger.info(u"Rain detected - cannot water \"%s - %s\"" % (dev.name, zoneName))
 					return
 				# Disable any current program
 				self.allZonesOff(dev, sid)
 				self.sleep(5) # Workaround when switching manual stations
 				self.querySprinkler(dev, "cm", {'sid': sid, 'en': 1, 't': props['maxtime']})
-				indigo.server.log(u"sent \"%s - %s\" on" % (dev.name, zoneName))
+				self.logger.info(u"sent \"%s - %s\" on" % (dev.name, zoneName))
 				dev.updateStateOnServer("activeZone", action.zoneIndex)
 			except Exception as e:
-				indigo.server.log(u"send \"%s\" zone \"%s\" on failed: %s" % (dev.name, zoneName, unicode(e)), isError=True)
+				self.logger.info(u"send \"%s\" zone \"%s\" on failed: %s" % (dev.name, zoneName, str(e)), isError=True)
 
 		###### ALL ZONES OFF ######
 		elif action.sprinklerAction == indigo.kSprinklerAction.AllZonesOff:
@@ -156,14 +142,14 @@ class Plugin(indigo.PluginBase):
 	########################################
 	# General Action callback
 	######################
-	def actionControlGeneral(self, action, dev):
+	def actionControlUniversal(self, action, dev):
 		###### BEEP ######
-		if action.deviceAction == indigo.kDeviceGeneralAction.Beep:
+		if action.deviceAction == indigo.kUniversalAction.Beep:
 			# Beep the hardware module (dev) here:
-			indigo.server.log(u"\"%s\" %s is not supported" % (dev.name, "beep request"))
+			self.logger.info(u"\"%s\" %s is not supported" % (dev.name, "beep request"))
 
 		###### STATUS REQUEST ######
-		elif action.deviceAction == indigo.kDeviceGeneralAction.RequestStatus:
+		elif action.deviceAction == indigo.kUniversalAction.RequestStatus:
 			# Query hardware module (dev) for its current status here:
 			try:
 				status = self.querySprinkler(dev, "js")
@@ -174,6 +160,6 @@ class Plugin(indigo.PluginBase):
 						state = "On"
 					else:
 						state = "Off"
-					indigo.server.log(u'"%s": %s' % (zoneNames[i], state))
+					self.logger.info(u'"%s": %s' % (zoneNames[i], state))
 			except Exception as e:
-				indigo.server.log(u'Unable to get status: %s' % unicode(e))
+				self.logger.info(u'Unable to get status: %s' % str(e))
